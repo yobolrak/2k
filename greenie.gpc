@@ -1,0 +1,171 @@
+define GAME_SHOT_BUTTON = PS4_SQUARE;
+define MIN_HOLD_TIME = 300;
+
+int _activeShotDuration;
+int _uShot, _rShot, _dShot, _lShot;
+int _uEditOn, _rEditOn, _dEditOn, _lEditOn;
+int _lastRecordedShotDuration;
+
+init
+{
+    _uShot = get_pvar(SPVAR_1, 0, 4000, 0);
+    _rShot = get_pvar(SPVAR_2, 0, 4000, 0);
+    _dShot = get_pvar(SPVAR_3, 0, 4000, 0);
+    _lShot = get_pvar(SPVAR_4, 0, 4000, 0);
+}
+
+
+main
+{
+    //set trace values
+    set_val(TRACE_1, _uShot / 10);
+    set_val(TRACE_2, _uShot % 10);
+    set_val(TRACE_3, _lastRecordedShotDuration / 10);
+    set_val(TRACE_4, _lastRecordedShotDuration % 10);
+
+    //record shot duration
+    if (get_val(GAME_SHOT_BUTTON) && isButtonHeld(GAME_SHOT_BUTTON)) {
+        _lastRecordedShotDuration = get_ptime(GAME_SHOT_BUTTON);
+    }
+
+    //when L2 and R2 is pressed
+    if (get_val(PS4_L2) && get_val(PS4_R2) && isButtonHeld(PS4_L2) && isButtonHeld(PS4_R2)) {
+        //save the last recorded shot duration to the specific stored shot duration
+        if (event_press(PS4_UP)) {
+            _uShot = _lastRecordedShotDuration;
+            set_val(PS4_UP, 0);
+        }
+        else if (event_press(PS4_RIGHT)) {
+            _rShot = _lastRecordedShotDuration;
+            set_val(PS4_RIGHT, 0);
+        }
+        else if (event_press(PS4_DOWN)) {
+            _dShot = _lastRecordedShotDuration;
+            set_val(PS4_DOWN, 0);
+        }
+        else if (event_press(PS4_LEFT)) {
+            _lShot = _lastRecordedShotDuration;
+            set_val(PS4_LEFT, 0);
+        }
+    }
+
+    //take the shot when the new shot button is pressed
+    if (get_val(PS4_UP)) {
+        _activeShotDuration = _uShot;
+        combo_run (takeShot);
+        checkShotDurationAdjustment(PS4_UP);
+    }
+    else if (get_val(PS4_RIGHT)) {
+        _activeShotDuration = _rShot;
+        combo_run (takeShot);
+        checkShotDurationAdjustment(PS4_RIGHT);
+    }
+    else if (get_val(PS4_DOWN)) {
+        _activeShotDuration = _dShot;
+        combo_run (takeShot);
+        checkShotDurationAdjustment(PS4_DOWN);
+    }
+    else if (get_val(PS4_LEFT)) {
+        _activeShotDuration = _lShot;
+        combo_run (takeShot);
+        checkShotDurationAdjustment(PS4_LEFT);
+    }
+}
+
+combo takeShot {
+    set_val(GAME_SHOT_BUTTON, 100);
+    wait(_activeShotDuration);
+    set_val(GAME_SHOT_BUTTON, 0);
+    wait(100);
+}
+
+function persistShotDuration(button) {
+    if(button == PS4_UP && _uShot > MIN_HOLD_TIME) {
+        set_pvar(SPVAR_1, _uShot);
+    }
+    else if(button == PS4_RIGHT && _rShot > MIN_HOLD_TIME) {
+        set_pvar(SPVAR_2, _rShot);
+    }
+    else if(button == PS4_DOWN && _dShot > MIN_HOLD_TIME) {
+        set_pvar(SPVAR_3, _dShot);
+    }
+    else if(button == PS4_LEFT && _lShot > MIN_HOLD_TIME) {
+        set_pvar(SPVAR_4, _lShot);
+    }
+
+    _uEditOn = FALSE;
+    _rEditOn = FALSE;
+    _dEditOn = FALSE;
+    _lEditOn = FALSE;
+}
+
+function isButtonHeld(button) {
+    if(get_ptime(button) > MIN_HOLD_TIME) {
+        return TRUE;
+    } else {
+        return FALSE;
+    }
+}
+
+function incrementShotDuration(button, duration) {
+    if(button == PS4_UP) {
+        _uShot = _uShot + duration;
+        _uEditOn = TRUE;
+    }
+    else if(button == PS4_RIGHT) {
+        _rShot = _rShot + duration;
+        _rEditOn = TRUE;
+    }
+    else if(button == PS4_DOWN) {
+        _dShot = _dShot + duration;
+        _dEditOn = TRUE;
+    }
+    else if(button == PS4_LEFT) {
+        _lShot = _lShot + duration;
+        _lEditOn = TRUE;
+    }
+}
+
+function decrementShotDuration(button, duration) {
+    if(button == PS4_UP) {
+        _uShot = _uShot - duration;
+        _uEditOn = TRUE;
+    }
+    else if(button == PS4_RIGHT) {
+        _rShot = _rShot - duration;
+        _rEditOn = TRUE;
+    }
+    else if(button == PS4_DOWN) {
+        _dShot = _dShot - duration;
+        _dEditOn = TRUE;
+    }
+    else if(button == PS4_LEFT) {
+        _lShot = _lShot - duration;
+        _lEditOn = TRUE;
+    }
+}
+
+function checkShotDurationAdjustment(button) {
+    //adjust the recorded shot
+    if (get_val(button)) {
+        if (event_press(PS4_R2)) {
+            incrementShotDuration(button, 5);
+        }
+        if (event_press(PS4_R1)) {
+            incrementShotDuration(button, 1);
+        }
+
+        if (event_press(PS4_L1)) {
+            decrementShotDuration(button, 1);
+        }
+
+        set_val(button, 0);
+        set_val(PS4_L2, 0);
+        set_val(PS4_R2, 0);
+        set_val(PS4_L1, 0);
+        set_val(PS4_R1, 0);
+    }
+    else if (_uEditOn || _rEditOn || _dEditOn || _lEditOn) {
+        persistShotDuration(button);
+    }
+}
